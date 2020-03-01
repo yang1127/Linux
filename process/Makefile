@@ -1,3 +1,5 @@
+exec:exec.c
+	gcc $^ -o $@
 wait:wait.c
 	gcc $^ -o $@
 exit:exit.c
