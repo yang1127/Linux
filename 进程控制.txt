@@ -1,0 +1,175 @@
+进程控制：进程创建 / 进程终止 / 进程等待 / 程序替换
+
+1.进程创建
+
+pid_t fork(void) -> 通过复制父进程，创建子进程
+返回值：-1：创建子进程失败
+        ==0：对于子进程，返回值时0
+        >0：对于父进程，返回值是子进程的pid
+1.1 pid_t vfork(void);
+	* 创建一个子进程，但vfork创建子进程之后父进程会阻塞，直到子进程退出或者程序替换；
+	* vfork创建的子进程与父进程共用同一个虚拟地址空间 -> 为防止调用栈混乱，因此阻塞父进程；
+	* fork和vfork两个接口创建子进程(pcb)，都是在内核中通过调用clone函数实现的，在clone函数中实现task_struct的创建，以及根据参数不同，创建拷贝不同的数据（例如：vfork就不需要为子进程创建虚拟地址空间/页表）
+
+2.进程终止
+
+2.1 进程的终止场景
+	* 异常退出
+	* 正常退出，结果符合预期
+	* 正常退出，结果不符合预期
+
+    //获取一个系统调用的错误信息
+	void perror(char *msg)  
+	char *strerror(int errno)
+	
+2.2 如何终止一个进程
+	1. 在main函数中return
+	2. 在任意地方调用exit(int statu)接口----库函数接口----退出前都会刷新缓冲区
+	3. 在任意地方调用_exit(int statu)接口----系统调用接口----退出时会直接释放所有资源
+
+  1 #include <stdio.h>
+  2 #include <unistd.h>
+  3 #include <stdlib.h>
+  4
+  5 int main()
+  6 {
+  7         printf("今天有些小糟糕！");
+  8         sleep(3);
+  9         _exit(0);//_exit:直接退出，释放所有资源
+10          exit(0); //exit:退出刷新缓冲区
+11          return 0;// return:退出进程时，刷新缓冲区，把缓冲区文件写到文件中
+12 }
+
+3.进程等待
+	* 等待子进程的退出，获取这个子进程的返回值，回收子进程的所有资源，避免产生僵尸进程
+
+【如何等待】
+	* int wait(int *statu); ----阻塞接口
+	* 阻塞：为了完成一个功能，发起调用，若当前不具备完成条件，则一直等待，直到完成后返回
+	* 非阻塞：为了完成一个功能，发起调用，若当前不具备完成条件，则立即报错返回
+
+  1 #include <stdio.h>
+  2 #include <stdlib.h>
+  3 #include <unistd.h>
+  4 #include <sys/wait.h>
+  5
+  6 int main()
+  7 {
+  8         pid_t pid = fork(); //创建一个子进程
+  9         if (pid < 0){
+10                 perror("fork error"); //出错
+11                 return -1;
+12         }else if (pid == 0){ //子进程
+13                 sleep(3);
+14                 exit(0); //僵尸进程->子进程先于父进程退出
+15         }
+16         wait(NULL);
+17
+18
+19         while(1){ //死循环
+20                 printf("------\n");
+21                 sleep(1);
+22         }
+23         return 0;
+24 }
+ 
+pid_t waitpid(pid_t pid, int *status, int options);
+
+1. 可以的等待指定pid的子进程退出；
+2. status：返回值
+3. options 若被指定为 WNOHANG ，则将waitpid设置为非阻塞；
+4.  pid：-1：表示等待任意一个子进程；
+             >0：表示等待指定pid的子进程；
+     返回值：
+             >0：  返回的是退出子进程的pid；
+             ==0：没有子进程退出；
+             <0:     等待错误；
+
+
+  1 #include <stdio.h>
+  2 #include <unistd.h>
+  3 #include <stdlib.h>
+  4 #include <errno.h>
+  5 #include <sys/wait.h>
+  6
+  7 int main()
+  8 {
+  9         pid_t pid = fork(); //创建子进程
+10         if (pid < 0) {
+11                 perror("fork error"); //出错
+12                 return -1;
+13         }else if (pid == 0) { //==0为子进程
+14                 sleep(5);
+15                 exit(99);
+16         }
+17         //wait(NULL);
+18         int status; //1位
+19         while (waitpid(-1, &status, WNOHANG) == 0) {
+20                 printf("吃饭饭~~~hahahah\n");
+21                 sleep(1);
+22         }
+23         if (status & 0x7f) { //低7位
+24                 printf("program error\n");
+25                 return -1;
+26         }
+27         if (WIFEXITED(status)) {
+28                 printf("exit code:%d\n", WEXITSTATUS(status));
+29         }
+30         printf("exit child code:%d\n", (status >> 8) & 0xff);
+           //status返回值存在一个字节中，而int wait(int *statu) 存在四个字节中，前两字节不存真实存在第三字节中，所以采取做法：右移8位(第四字节：高1位低7位，低8位中存：异常信号退出值) & 0xff（0x000000ff）
+           //低7位中：全为0，则程序正常退出；不为0，则异常退出
+31
+32         while(1) {
+33                 printf("-------\n");
+34                 sleep(1);
+35         }
+36         return 0;
+37 }
+
+
+4.程序替换：替换一个进程正在运行的程序
+	* 进程替换运行的程序后，会初始化虚拟地址空间中的代码段和数据段，并且更新页表信息
+
+【如何进行程序替换：exec函数族】exter char **environ;
+
+l：
+int execl(const char *path, const char *arg, ...); //path：一个可执行程序文件的路径名; *arg, ...：运行参数
+int execlp(const char *file, const char *arg, ...);
+int execle(const char *path, const char *arg, ..., char *const envp[]);
+
+v：
+int execv(const char *path, char *argv[]);
+int execvp(const char *file, char *argv[]);
+int execve(const char *file, char *argv[], char *const envp[]);
+
+  1 #include <stdio.h>
+  2 #include <unistd.h>
+  3 #include <stdlib.h>
+  4
+  5 //int main()
+  6 int main(int argc, char *margv[], char *env[])
+  7 {
+  8         //execl("/bin/ls", "ls", "-l", "-a", NULL);//“ls”运行参数
+  9
+10         char *argv[32] = {NULL};
+11         argv[0] = "ls";
+12         argv[1] = "-l";
+13         argv[2] = NULL;
+14         //execv("/bin/ls", argv);
+15
+16         /*
+17         if (execvp("ls", argv) < 0) { //execv需要路径、execvp不需要路径,但进限制于path环境变量，给路径也不算错,运行系统默认命令
+18                 perror("execv error");
+19                 return -1;
+20         }
+21         */
+22
+23         //子进程的环境变量实际上都是父进程给的
+24         if (execve("./env", argv, NULL) < 0) {
+25                 perror("execv error");
+26                 return -1;
+27         }
+28         printf("吃饭饭~~hahahah~~\n");
+29         return 0;
+30 }
+
