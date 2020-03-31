@@ -1,0 +1,47 @@
+1.标准库IO
+	fopen(char *filename, char *mode) 
+	fread(char *buf, size_ t bsize, size_ t nnum, FILE *fp)
+	fwrite(char *data, size_ t bsize, size. t nnum, FILE *fp)
+	fseek(FILE *fp, size_t offset, int whence)
+	fclose(FILE *fp)
+
+	1. 打开模式是a，写入的时候总是写入到文件末尾，并且不管读写位置如何跳转;
+	2. fread/fwrite返回值都是块个数，而不是数据字节长度，因此写法中块大小给1，便于使用;
+	3. 从文件中读取的数据进行字符串处理的时候，需要注意文件内容中有可能有空数据，导致文件内容字符串处理不完全;
+	4. r+以追加方式打开时，文件的默认读写位置是在起始位置，注意会覆盖式写入数据；
+	5. w方式打开文件时，会清空原有内容。
+
+2.系统调用IO
+	open(char *filename, int flags，mode_t mode);
+	ssize_t write(int fd, const void *buf, size_t count);
+	ssize_t read(int fd, void *buf, size_t count);
+	off_t lseek(int fd, off_t offset, int whence);
+	int close(int fd);
+	
+3.文件描述符
+
+【文件描述符和文件流指针的关系】
+
+	* 标准库接口使用文件流指针 FILE *fp; ---库函数接口的操作句柄
+	* 系统调用接口使用文件描述符 int fd; ---系统调用接口的操作句柄
+	* 库函数与系统调用接口关系：上下级调用关系
+	* 文件流指针这个结构体包含了文件描述符，当使用标准库接口进行io，则最终是通过文件流指针找到文件描述符进而对文件进行操作。
+
+4.重定向：本质是对文件描述符的重定向
+
+	* 我们操作一个文件的时候，都是通过描述符操作的，当这个描述符对应在内核中文件描述信息表中的描述信息若改变成为另一个文件描述信息，会造成一个情况：操作的文件描述符没有变，但是具体操作的文件却改变了
+
+5.文件系统
+
+	* 磁盘分区：交换分区+文件系统分区;
+	* 文件系统分区可以有多个。
+
+6.软/硬链接
+
+	* 创建硬链接: ln a.txt a.hard
+	* 创建软链接: ln -s a.txt a.soft
+	
+7.动/静态库
+
+	* 动态库：程序在运行的时候采取链接动态库的代码，多个程序共享使用库的代码；
+	* 静态库：程序在编译链接的时候把库的代码链接到可执行程序当中，程序运行的时候不再需要静态库。
