@@ -1,3 +1,9 @@
+poor:poor.cpp
+	g++ $^ -o $@ -lpthread
+thpool:thpool.c
+	g++ $^ -o $@ -lpthread
+RQ:RQ.c
+	g++ $^ -o $@ -lpthread
 sem:sem.c
 	gcc $^ -o $@ -lpthread
 con_pro:con_pro.c
