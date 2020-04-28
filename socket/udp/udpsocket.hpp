@@ -11,8 +11,7 @@ private:
     int _sockfd;
 private:
 
-    void MakeAddr(struct sockaddr_in &addr, const std::string &ip, 
-                  const uint16_t port){
+    void MakeAddr(struct sockaddr_in &addr, const std::string &ip, const uint16_t port){
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
         addr.sin_addr.s_addr = inet_addr(ip.c_str());
@@ -20,6 +19,7 @@ private:
 public:
     UdpSocket():_sockfd(-1) {}
 
+    //创建套接字
     bool Socket() {
         _sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (_sockfd < 0) {
@@ -29,6 +29,7 @@ public:
         return true;
     }
 
+    //绑定地址信息
     bool Bind(const std::string &ip, const uint16_t port){
         struct sockaddr_in addr;
         MakeAddr(addr, ip, port);
@@ -41,13 +42,13 @@ public:
         return true;
     }
 
+    //发送数据
     bool Send(const std::string &buf, std::string &dip, uint16_t dport) {
         struct sockaddr_in addr;
         MakeAddr(addr, dip, dport);
         socklen_t len = sizeof(struct sockaddr_in);
 
-        int ret = sendto(_sockfd, &buf[0], buf.size(), 0, 
-                         (struct sockaddr*)&addr, len);
+        int ret = sendto(_sockfd, &buf[0], buf.size(), 0, (struct sockaddr*)&addr, len);
         if (ret < 0) {
             perror("sendto error");
             return false;
@@ -55,14 +56,13 @@ public:
         return true;
     }
 
-    bool Recv(std::string &buf, 
-              std::string *ip = NULL, uint16_t *port = NULL) {
+    //接收数据
+    bool Recv(std::string &buf, std::string *ip = NULL, uint16_t *port = NULL) {
         struct sockaddr_in addr;
         socklen_t len = sizeof(struct sockaddr_in);
         char tmp[4096] = {0};
 
-        int ret = recvfrom(_sockfd, tmp, 4095, 0, 
-                           (struct sockaddr*)&addr, &len);
+        int ret = recvfrom(_sockfd, tmp, 4095, 0, (struct sockaddr*)&addr, &len);
         if (ret < 0) {
             perror("recvfrom error");
             return false;
@@ -78,6 +78,7 @@ public:
         return true;
     }
 
+    //关闭套接字
     bool Close() {
         close(_sockfd);
     }
