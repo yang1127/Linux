@@ -1,6 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
 #include "tcpsocket.hpp"
+
+void sigcb(int signum)
+{
+	printf("recv a signum:%d\n", signum);
+}
 
 int main(int argc, char *argv[])
 {
@@ -8,6 +14,7 @@ int main(int argc, char *argv[])
         std::cerr << "./tcp_cli ip port\n";
         return -1;
     }
+    signal(SIGPIPE, sigcb);
     std::string ip = argv[1];
     uint16_t port = atoi(argv[2]);
 
